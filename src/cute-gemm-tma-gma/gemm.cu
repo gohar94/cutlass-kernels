@@ -298,6 +298,7 @@ __global__ static void gemm_device(
   cute::prefetch_tma_descriptor(tma_load_b.get_tma_descriptor());
   __syncthreads();
 
+
 //
 // Prepare the TMA_LOAD for A
 // Loop over the TMA stages, using smem as our buffer
@@ -308,9 +309,11 @@ __global__ static void gemm_device(
     constexpr int kTmaTransactionBytes =
         size(sA) * sizeof_bits_v<TA> / 8 + size(sB) * sizeof_bits_v<TB> / 8;
 
+    cfk::barrierInit(tma_load_mbar[0], 1);
     cfk::copy(tAgA(_, stage), tBgB(_, stage), tAsA(_, 0), tBsB(_, 0),
-              tma_load_a, tma_load_b, tma_load_mbar, mcast_mask_a,
+              tma_load_a, tma_load_b, tma_load_mbar[0], mcast_mask_a,
               mcast_mask_b);
+    cute::wait_barrier(tma_load_mbar[0], 0); // This is REQUIRED.
     cfk::gemm(tiled_mma, tCrA, tCrB, tCrC);
 
 #ifdef COPYOUTAB
